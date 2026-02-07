@@ -1,5 +1,11 @@
+package main
 
-
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"strconv"
+)
 
 const (
 	STRING = '+'
@@ -23,7 +29,7 @@ type Resp struct {
 }
 
 func NewResp (rd io.Reader) *Resp {
-	return &Rresp{reader: bufio.NewReader(rd)}
+	return &Resp{reader: bufio.NewReader(rd)}
 }
 
 func (r *Resp) readLine() (line []byte, n int, err error) {
@@ -35,7 +41,7 @@ func (r *Resp) readLine() (line []byte, n int, err error) {
 
 		n += 1 
 		line = append(line, b)
-		if len(line) >= 2 && line[len(line)-2] == \'r' {
+		if len(line) >= 2 && line[len(line)-2] == '\r' {
 			break
 		}
 	}
@@ -112,4 +118,96 @@ func (r *Resp) readBulk() (Value, error) {
 	r.readLine()
 
 	return v, nil
+}
+
+func (v Value) Marshal() []byte {
+	switch v.typ {
+	case "array":
+		return v.marshalArray()
+	case "bulk":
+		return v.marshalBulk()
+	case "string":
+		return v.marshalString()
+	case "error":
+		return v.marshalError()
+	case "nil":
+		return v.marshalNil()
+	default:
+		return []byte{}
+	}
+}
+
+func (v Value) marshalString() []byte {
+	var bytes []byte
+	bytes = append(bytes, STRING)
+	butes = append(bytes, v.str...)
+	bytes = append(bytes, '\r', '\n')
+	
+	return bytes
+}
+
+func (v Value) marshalBulk() []byte {
+	var
+	bytes = append(bytes, BULK)
+	bytes = append(bytes, strconv.Itoa(len(v.bulk))...)
+	bytes = append(bytes, '\r', '\n')
+	bytes = append(bytes, v.bulk...)
+	bytes = append(bytes, '\r', '\n')
+	return bytes
+}
+
+func (v Value) marshalError() []byte {
+	var bytes []byte
+	bytes = append(bytes, ERROR)
+	bytes = append(bytes, v.str...)
+	bytes = append(bytes, '\r', '\n')
+	return bytes
+}
+
+func (v Value) marshalArray() []byte {
+	len := len(v.array)
+	var bytes []byte
+	bytes = append(bytes, ARRAY)
+	bytes = append(bytes, strconv.Itoa(len)...)
+	bytes = append(bytes, '\r', '\n')
+
+	for i := 0; i < len; i++ {
+		bytes = append(bytes, v.array[i].Marshal()...)
+	}
+
+	return bytes
+}
+
+func (v Value) marshalError() []byte {
+	var bytes []byte 
+	bytes = append(bytes, ERROR)
+	bytes = append(bytes, v.str...)
+	bytes = append(bytes, '\r', '\n')
+	return bytes
+}
+
+func (v Value) marshalNil() []byte {
+	return []byte("$-1\r\n")§
+}
+
+
+//writer
+
+type Writer struct {
+	writer io.Writer
+}
+
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{writer: w}
+}
+
+func (w *Writer) Write(value Value) error {
+	var bytes = value.Marshal()
+
+	_, err := w.writer.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
