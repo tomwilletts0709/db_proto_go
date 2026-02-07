@@ -4,12 +4,12 @@ import (
 	"sync"
 )
 
-var Handlers = map[string]func([] Value) Value{
-	"PING": ping, 
-	"SET": set,
-	"GET": get,
-	"HSET": hset,
-	"HGET": hget,
+var Handlers = map[string]func([]Value) Value{
+	"PING":    ping,
+	"SET":     set,
+	"GET":     get,
+	"HSET":    hset,
+	"HGET":    hget,
 	"HGETALL": hgetall,
 }
 
@@ -52,7 +52,7 @@ func get(args []Value) Value {
 		return Value{typ: "nil"}
 	}
 
-	return value{typ: "bulk", bulk: value}
+	return Value{typ: "bulk", bulk: value.str}
 
 }
 
@@ -78,23 +78,51 @@ func hset(args []Value) Value {
 
 	HSETsMu.Unlock()
 
-	return Value(typ: "string", str: "OK")
+	return Value{typ: "string", str: "OK"}
 }
 
 func hget(args []Value) Value {
 	if len(args) != 2 {
-		return Value(typ: "error", str: "ERR wrong number of arguments for 'hget' command")
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'hget' command"}
 	}
 
 	hash := args[0].bulk
 	key := args[1].bulk
 
 	HSETsMu.RLock()
-	value, ok := HSETs[hash][key]
+	hashMap, exists := HSETs[hash]
+	if !exists {
+		HSETsMu.RUnlock()
+		return Value{typ: "nil"}
+	}
+	value, ok := hashMap[key]
 	HSETsMu.RUnlock()
 
 	if !ok {
 		return Value{typ: "nil"}
 	}
 	return Value{typ: "bulk", bulk: value}
+}
+
+func hgetall(args []Value) Value {
+	if len(args) != 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'hgetall' command"}
+	}
+
+	hash := args[0].bulk
+
+	HSETsMu.RLock()
+	hashMap, exists := HSETs[hash]
+	if !exists {
+		HSETsMu.RUnlock()
+		return Value{typ: "array", array: []Value{}}
+	}
+	// Copy keys/values so we can unlock before building response
+	pairs := make([]Value, 0, len(hashMap)*2)
+	for k, v := range hashMap {
+		pairs = append(pairs, Value{typ: "bulk", bulk: k}, Value{typ: "bulk", bulk: v})
+	}
+	HSETsMu.RUnlock()
+
+	return Value{typ: "array", array: pairs}
 }
