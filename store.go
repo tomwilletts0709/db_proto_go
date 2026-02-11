@@ -40,3 +40,10 @@ func (s *Store) Hset(hash string, key string, value string) {
 	s.hsets[hash][key] = value
 	s.mu.Unlock()
 }
+
+func (s *Store) Hget(hash string, key string) string {
+	s.mu.RLock()
+	value, ok := s.hsets[hash][key]
+	s.mu.RUnlock()
+	return value, ok
+}
