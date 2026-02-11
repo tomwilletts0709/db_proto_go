@@ -11,6 +11,8 @@ var Handlers = map[string]func([]Value) Value{
 	"HSET":    hset,
 	"HGET":    hget,
 	"HGETALL": hgetall,
+	"DEL":     del,
+	"ECHO":    echo,
 }
 
 func ping(args []Value) Value {
@@ -125,4 +127,18 @@ func hgetall(args []Value) Value {
 	HSETsMu.RUnlock()
 
 	return Value{typ: "array", array: pairs}
+}
+
+func del(args []Value) Value {
+	if len(args) != 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'del' command"}
+	}
+
+	key := args[0].bulk
+	SETsMu.Lock()
+
+	delete(SETs, key)
+	SETsMu.Unlock()
+
+	return Value{typ: "integer", num: 1}
 }
